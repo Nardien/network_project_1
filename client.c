@@ -7,6 +7,8 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <netdb.h>
+#include <getopt.h>
 
 #define BUFSIZE 10000000 - 16
 
@@ -34,7 +36,7 @@ int check_validity(struct header* hdr, char data[]) {
 	}
 
 	/* check keyword validity */
-	strcpy(keyword, hdr->keyword);
+	memcpy(keyword, &hdr->keyword, 4);
 
 	int i = 0;
 
@@ -54,7 +56,7 @@ int check_validity(struct header* hdr, char data[]) {
 		i++;
 	}
 
-	if (hdr->checksum != (datasum + (uint16_t)hdr->option + (uint16_t)hdr->keyword + (uint16_t)hdr->length)) {
+	if (hdr->checksum != (datasum + (uint16_t)hdr->op + (uint16_t)hdr->keyword + (uint16_t)hdr->length)) {
 		/* checksum error */
 		fprintf(stderr, "checksum error");
 		return -1;
@@ -67,9 +69,7 @@ int check_validity(struct header* hdr, char data[]) {
 
 int main(int argc, char* argv[]) {
 
-	int flag_h, flag_p, flag_o, flag_k;
-	int c;
-	char* host, port, op, key;
+	int status;
 
 	struct addrinfo hints, *servinfo, *p;
 	int sockfd, n;
@@ -79,7 +79,15 @@ int main(int argc, char* argv[]) {
 	char data[BUFSIZE];
 	uint16_t datasum;
 
-	while ((c = getopt(argv, argv, "h:p:o:k:")) != -1) {
+	int flag_h = 0, flag_p = 0, flag_o = 0, flag_k = 0;
+	int c;
+
+	char* host = NULL;
+	char* port = NULL;
+	char* op = NULL;
+	char* key = NULL;
+	
+	while ((c = getopt(argc, argv, "h:p:o:k:")) != -1) {
 		switch(c) {
 			case 'h' :
 				flag_h = 1;
@@ -102,6 +110,8 @@ int main(int argc, char* argv[]) {
 				break;
 		}
 	}
+
+
 
 	if (!flag_p) {
 		fprintf(stderr, "port number is not given\n");
@@ -162,13 +172,13 @@ int main(int argc, char* argv[]) {
 
 	hdr = malloc(sizeof(struct header));
 
-	hdr->option = op;
-	hdr->keyword = key;
+	hdr->op = atoi(op);
+	memcpy(&hdr->keyword, key, 4);
 
 	fgets(data, BUFSIZE, stdin);  /* get string from stdin */
 
 	hdr->length = 16 + strlen(data);
-	hdr->checksum = (uint16_t)hdr->option + (uint16_t)hdr->keyword + (uint16_t)hdr->length;
+	hdr->checksum = (uint16_t)hdr->op + (uint16_t)hdr->keyword + (uint16_t)hdr->length;
 
 	datasum = 0;
 	int i = 0;
@@ -184,35 +194,35 @@ int main(int argc, char* argv[]) {
 
 	if (n < 0) {
 		fprintf(stderr, "error at writing to socket\n");
-		break;
+		//break;
 	}
 
 	n = send(sockfd, data, strlen(data) + 1, 0);
 
 	if (n < 0) {
 		fprintf(stderr, "error at writing to socket\n");
-		break;
+		//break;
 	}
 
 	// #1 ends
 
 	// #2
 
-	memset(header, 0, sizeof(struct header));
+	memset(hdr, 0, sizeof(struct header));
 	memset(data, 0, BUFSIZE);
 
 	n = recv(sockfd, hdr, sizeof(struct header), 0);
 
 	if (n < 0) {
 		fprintf(stderr, "fail to read\n");
-		break;
+		//break;
 	}
 
 	n = recv(sockfd, data, BUFSIZE, 0);
 
 	if (n < 0) {
 		fprintf(stderr, "fail to read\n");
-		break;
+		//break;
 	}
 
 	if (check_validity(hdr, data) < 0) {
