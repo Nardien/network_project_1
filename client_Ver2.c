@@ -264,9 +264,13 @@ int main(int argc, char* argv[]) {
 
 	int datalen = strlen(sending_data);
 	memset(hdr, 0, sizeof(struct header));
-	char data_resend[datalen];
+	char* data_resend;
+	char* hdr_and_data;
 
-	n = recv(sockfd, hdr, sizeof(struct header), 0);
+	hdr_and_data = malloc(sizeof(struct header) + datalen);
+	data_resend = malloc(datalen);
+
+	/*n = recv(sockfd, hdr, sizeof(struct header), 0);
 
 	if (n < 0) {
 		fprintf(stderr, "fail to read\n");
@@ -278,7 +282,18 @@ int main(int argc, char* argv[]) {
 	if (n < 0) {
 		fprintf(stderr, "fail to read\n");
 		exit(1);
+	}*/
+
+	n = recv(sockfd, hdr_and_data, sizeof(struct header) + datalen, 0);
+
+	if (n < 0) {
+		fprintf(stderr, "fail to read\n");
+		exit(1);
 	}
+
+	hdr = (struct header*) hdr_and_data;
+	memcpy(data_resend, hdr_and_data + sizeof(struct header), datalen);
+
 
 	printf("\nop : %d\nkeyword : %u\nlength : %u\nchecksum : %u\n",
 		(int)hdr->op, (unsigned int)hdr->keyword, (unsigned int)hdr->length, (unsigned int)hdr->checksum);
@@ -289,9 +304,9 @@ int main(int argc, char* argv[]) {
 		exit(0);
 	}
 
-	char data_print[strlen(sending_data) + 1];
+	char data_print[datalen + 1];
 	strcpy(data_print, data_resend);
-	data_print[strlen(sending_data)] = '\0';
+	data_print[datalen] = '\0';
 
 	printf("%s\n", data_print);
 
@@ -301,6 +316,11 @@ int main(int argc, char* argv[]) {
 	free(port);
 	free(op);
 	free(key);
+
+	/*free(hdr);
+	free(sending_data);
+	free(hdr_and_data);
+	free(data_resend);*/
 
 	return 0;
 }
