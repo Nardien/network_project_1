@@ -1,3 +1,5 @@
+/* client.c */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -16,6 +18,52 @@ struct header {
 	uint64_t length;
 
 };
+
+/* Check validity of header by computing checksum 
+   If header is valid, return 0. Else, return -1 */
+int check_validity(struct header* hdr, char data[]) {
+
+	char keyword[4];
+	uint16_t datasum;
+
+	/* check operation if it is 0 or 1 */
+	if (hdr->op != 0 && hdr->op != 1) {
+		/* invalid operation */
+		fprintf(stderr, "invalid operation");
+		return -1;
+	}
+
+	/* check keyword validity */
+	strcpy(keyword, hdr->keyword);
+
+	int i = 0;
+
+	for (i = 0; i < 4; i++) {
+		if (keyword[i] < 65 && 90 < keyword[i] && keyword[i] < 97 && 122 < keyword[i]) {
+			/* i-th char of keyword is non-alphabet */
+			fprintf(stderr, "invalid keyword");
+			return -1;
+		}
+	}
+
+	i = 0;
+
+	/* check checksum */
+	while (data[i] != '\0') { 
+		datasum += (uint16_t)data[i];   /* sum of all char in data */
+		i++;
+	}
+
+	if (hdr->checksum != (datasum + (uint16_t)hdr->option + (uint16_t)hdr->keyword + (uint16_t)hdr->length)) {
+		/* checksum error */
+		fprintf(stderr, "checksum error");
+		return -1;
+	}
+
+	return 0;
+
+}
+
 
 int main(int argc, char* argv[]) {
 
@@ -75,6 +123,8 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 
+	// #1
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
@@ -123,8 +173,9 @@ int main(int argc, char* argv[]) {
 	datasum = 0;
 	int i = 0;
 
-	while (data[i] != '\n') { 
+	while (data[i] != '\0') { 
 		datasum += (uint16_t)data[i];   /* sum of all char in data */
+		i++;
 	}
 
 	hdr->checksum += datasum;
@@ -142,6 +193,39 @@ int main(int argc, char* argv[]) {
 		fprintf(stderr, "error at writing to socket\n");
 		break;
 	}
+
+	// #1 ends
+
+	// #2
+
+	memset(header, 0, sizeof(struct header));
+	memset(data, 0, BUFSIZE);
+
+	n = recv(sockfd, hdr, sizeof(struct header), 0);
+
+	if (n < 0) {
+		fprintf(stderr, "fail to read\n");
+		break;
+	}
+
+	n = recv(sockfd, data, BUFSIZE, 0);
+
+	if (n < 0) {
+		fprintf(stderr, "fail to read\n");
+		break;
+	}
+
+	if (check_validity(hdr, data) < 0) {
+		fprintf(stderr, "violate protocol rules");
+		close(sockfd);
+		exit(0);
+	}
+
+	// #2 ends
+
+	// #3
+
+	printf("%s\n", data);
 
 	close(sockfd);
 
